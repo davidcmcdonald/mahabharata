@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mahabharata — Directory & Family Tree</title>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Mahabharata — Directory & Family Tree</h1>
+      <div class="toolbar">
+        <label class="searchbox">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="q" type="search" placeholder="Search names, epithets, notes…" autocomplete="off" />
+        </label>
+        <select id="role"><option value="">All roles</option><option>Deity</option><option>Sage</option><option>King/Queen</option><option>Warrior</option><option>Prince/Princess</option><option>Minister</option><option>Other</option></select>
+        <select id="house"><option value="">All houses</option><option>Kuru</option><option>Pandava</option><option>Kaurava</option><option>Yadava</option><option>Other</option></select>
+        <select id="gen"><option value="">All generations</option><option>Ancestors</option><option>Elders</option><option>Adults</option><option>Next Gen</option></select>
+        <button id="showDir" class="pill secondary">Directory</button>
+        <button id="showTree" class="pill">Family Tree</button>
+      </div>
+      <div class="chips" id="activeFilters"></div>
+      <div class="chapbar">
+        <strong>Chapter:</strong>
+        <input id="chapRange" type="range" min="1" max="20" value="1" />
+        <div id="chapLabel" class="muted">1</div>
+        <label class="chk"><input id="soFar" type="checkbox" checked /> Only introduced so far</label>
+        <label class="chk"><input id="hiLite" type="checkbox" checked /> Highlight mentions in this chapter</label>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="count" class="muted"></div>
+    <section id="grid"></section>
+
+    <section id="treePane">
+      <div id="treeToolbar">
+        <strong>Tree root:</strong>
+        <select id="rootSelect"></select>
+        <button id="fitTree" class="pill secondary">Fit to view</button>
+        <div class="legend">
+          <span><div class="dot" style="background:#b47c3a"></div>Kuru line</span>
+          <span><div class="dot" style="background:#d75b54"></div>Kauravas</span>
+          <span><div class="dot" style="background:#3aa76d"></div>Pandavas</span>
+          <span><div class="dot" style="background:#6a4fbf"></div>Sages</span>
+          <span><div class="dot" style="background:#3f6ea7"></div>Deities</span>
+        </div>
+      </div>
+      <svg id="tree" preserveAspectRatio="xMidYMid meet"></svg>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="./js/app.js" type="module"></script>
+  <script src="./js/tree.js" type="module"></script>
+</body>
+</html>

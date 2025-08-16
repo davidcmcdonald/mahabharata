@@ -1,103 +1,97 @@
-import { getPeople } from './app.js';
+// js/app.js
+import { people as peopleData } from "../data/people.js";
 
-const showDirBtn = document.getElementById('showDir');
-const showTreeBtn = document.getElementById('showTree');
-const treePane = document.getElementById('treePane');
-const treeSVG = d3.select('#tree');
-const rootSelect = document.getElementById('rootSelect');
-const fitBtn = document.getElementById('fitTree');
+const grid = document.getElementById('grid');
+const count = document.getElementById('count');
+const activeFilters = document.getElementById('activeFilters');
+const q = document.getElementById('q');
+const role = document.getElementById('role');
+const house = document.getElementById('house');
+const gen = document.getElementById('gen');
+const chapRange = document.getElementById('chapRange');
+const chapLabel = document.getElementById('chapLabel');
+const soFar = document.getElementById('soFar');
+const hiLite = document.getElementById('hiLite');
 
-showDirBtn.onclick = ()=>{ treePane.style.display='none'; document.getElementById('grid').style.display='grid'; };
-showTreeBtn.onclick = ()=>{ document.getElementById('grid').style.display='none'; treePane.style.display='block'; initTree(); };
-fitBtn.onclick = ()=> fitToView();
+let people = [];
 
-function colorFor(p){
-  switch(p.house){
-    case 'Kaurava': return '#d75b54';
-    case 'Pandava': return '#3aa76d';
-    case 'Kuru': return '#b47c3a';
-    case 'Yadava': return '#3f6ea7';
-    default:
-      if(p.role==='Sage') return '#6a4fbf';
-      if(p.role==='Deity') return '#3f6ea7';
-      return '#8c8c8c';
-  }
+init();
+
+function init(){
+  people = peopleData;
+  const maxInData = people.reduce(
+    (m,p)=>Math.max(m, ...(p.appearsIn && p.appearsIn.length ? p.appearsIn : [1])),
+    1
+  );
+  chapRange.max = Math.max(maxInData, 10);
+  hookEvents();
+  renderDir();
 }
 
-function initTree(){
-  const people = getPeople();
-  const roots = people.filter(p=>p.relations && p.relations.children && p.relations.children.length);
-  rootSelect.innerHTML = roots.map(r=>`<option>${r.name}</option>`).join('');
-  if(!rootSelect.value) rootSelect.value = 'Shantanu';
-  rootSelect.onchange = ()=> renderTree(rootSelect.value);
-  renderTree(rootSelect.value);
+function hookEvents(){
+  [q,role,house,gen].forEach(el=>el.addEventListener('input', renderDir));
+  chapRange.addEventListener('input', ()=>{
+    chapLabel.textContent = chapRange.value;
+    renderDir();
+  });
+  soFar.addEventListener('change', renderDir);
+  hiLite.addEventListener('change', renderDir);
 }
 
-function buildHierarchy(rootName){
-  const people = getPeople();
-  const byName = new Map(people.map(p=>[p.name,p]));
-  const seen = new Set();
-  function makeNode(name){
-    const p = byName.get(name);
-    const safe = p || {name, role:'Other', house:'Other', generation:'', relations:{children:[]}, notes:''};
-    if(seen.has(name)) return safe;
-    seen.add(name);
-    const kids = (safe.relations && safe.relations.children) ? safe.relations.children : [];
-    return { data: safe, children: kids.map(makeNode) };
-  }
-  return makeNode(rootName);
+function matches(p){
+  const term = q.value.trim().toLowerCase();
+  const chap = parseInt(chapRange.value,10);
+  const firstMention = (p.appearsIn && p.appearsIn.length) ? Math.min(...p.appearsIn) : Infinity;
+  if(role.value && p.role!==role.value) return false;
+  if(house.value && p.house!==house.value) return false;
+  if(gen.value && p.generation!==gen.value) return false;
+  if(soFar.checked && !(firstMention <= chap)) return false;
+  if(!term) return true;
+  const hay = [p.name, ...(p.aliases||[]), p.notes||''].join(' ').toLowerCase();
+  return hay.includes(term);
 }
 
-function renderTree(rootName){
-  treeSVG.selectAll('*').remove();
-  const rootObj = buildHierarchy(rootName);
-  const root = d3.hierarchy(rootObj, d=>d.children);
-  const dx = 90, dy = 220;
-  const treeLayout = d3.tree().nodeSize([dx, dy]);
-  treeLayout(root);
-
-  let x0 = Infinity, x1 = -Infinity;
-  root.each(d=>{ if(d.x < x0) x0 = d.x; if(d.x > x1) x1 = d.x; });
-  const width = Math.max(1200, root.height * dy + 200);
-  const height = Math.max(800, x1 - x0 + dx*2);
-  treeSVG.attr('viewBox', [(-dy*0.6), (x0 - dx), width, height]);
-
-  treeSVG.append('g')
-    .attr('fill','none')
-    .attr('stroke','#7c5b2e')
-    .attr('stroke-opacity',0.75)
-    .attr('stroke-width',2)
-    .selectAll('path')
-    .data(root.links())
-    .join('path')
-    .attr('class','link')
-    .attr('d', d3.linkHorizontal().x(d=>d.y).y(d=>d.x));
-
-  const node = treeSVG.append('g')
-    .selectAll('g')
-    .data(root.descendants())
-    .join('g')
-      .attr('class','node')
-      .attr('transform', d=>`translate(${d.y},${d.x})`);
-
-  node.append('rect')
-    .attr('x', -85).attr('y', -30).attr('width', 170).attr('height', 60)
-    .attr('stroke', d=>colorFor(d.data.data))
-    .attr('fill', '#fffaf0');
-
-  node.append('text')
-    .attr('class','name')
-    .attr('text-anchor','middle')
-    .attr('y', -6)
-    .text(d=>d.data.data.name);
-
-  node.append('text')
-    .attr('class','role')
-    .attr('text-anchor','middle')
-    .attr('y', 14)
-    .text(d=> `${d.data.data.role||''} · ${d.data.data.house||''}`.replace(/^ ·\s*/,'') );
-
-  fitToView();
+function cardHTML(p){
+  const chap = parseInt(chapRange.value,10);
+  const hit = (p.appearsIn||[]).includes(chap) && hiLite.checked;
+  const firstMention = (p.appearsIn && p.appearsIn.length) ? Math.min(...p.appearsIn) : null;
+  const aliases = p.aliases?.length ? `<div class="aka">aka: ${p.aliases.join(', ')}</div>`:'';
+  const tags = [p.role,p.house,p.generation].filter(Boolean).map(t=>`<span class="tag">${t}</span>`).join('');
+  const rel = p.relations||{};
+  const relHtml = ['father','mother','spouse','children'].map(k=>{
+    if(!rel[k]||!rel[k].length) return '';
+    return `<div class="rel"><strong>${k}:</strong> ${rel[k].join(', ')}</div>`;
+  }).join('');
+  const badges = [];
+  if(firstMention) badges.push(`First: ch ${firstMention}`);
+  if((p.appearsIn||[]).length>1) badges.push(`Mentions: ch ${(p.appearsIn||[]).slice(0,6).join(', ')}${(p.appearsIn||[]).length>6?'…':''}`);
+  return `<article class="card ${hit?'hit':''}">
+    <img class="avatar" alt="" src="https://placehold.co/96x96/png?text=${encodeURIComponent(p.name[0])}" />
+    <div>
+      <div class="title">${p.name}</div>
+      ${aliases}
+      <div class="meta">${tags}</div>
+      <div class="notes">${p.notes||''}</div>
+      ${badges.length?`<div class="badges">${badges.map(b=>`<span class='badge'>${b}</span>`).join('')}</div>`:''}
+      ${relHtml}
+    </div>
+  </article>`;
 }
 
-function fitToView(){ /* viewBox already fits */ }
+function renderDir(){
+  const list = people.filter(matches).sort((a,b)=>a.name.localeCompare(b.name));
+  count.textContent = `${list.length} of ${people.length} people shown — Chapter ${chapRange.value}`;
+  activeFilters.innerHTML = '';
+  [['Role',role.value],['House',house.value],['Gen',gen.value]].forEach(([k,v])=>{
+    if(v){
+      const s=document.createElement('span');
+      s.className='chip';
+      s.textContent=`${k}: ${v}`;
+      activeFilters.appendChild(s);
+    }
+  });
+  grid.innerHTML = list.map(cardHTML).join('');
+}
+
+// expose to tree.js
+export function getPeople(){ return people; }

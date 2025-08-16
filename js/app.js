@@ -25,7 +25,7 @@ let people = [];
 init();
 
 async function init(){
-  const res = await fetch('./data/people.json');
+  let peopleData = window.people; // now use peopleData instead of fetched JSON
   people = await res.json();
   const maxInData = people.reduce((m,p)=>Math.max(m, ...(p.appearsIn&&p.appearsIn.length?p.appearsIn:[1])), 1);
   chapRange.max = Math.max(maxInData, 10);

@@ -1,97 +1,198 @@
-// js/app.js
-import { people as peopleData } from "../data/people.js";
+// js/tree.js
+// One big zoomable D3 family tree, no dropdowns.
+// Builds edges from relations: father/mother -> child and parent -> children.
 
-const grid = document.getElementById('grid');
-const count = document.getElementById('count');
-const activeFilters = document.getElementById('activeFilters');
-const q = document.getElementById('q');
-const role = document.getElementById('role');
-const house = document.getElementById('house');
-const gen = document.getElementById('gen');
-const chapRange = document.getElementById('chapRange');
-const chapLabel = document.getElementById('chapLabel');
-const soFar = document.getElementById('soFar');
-const hiLite = document.getElementById('hiLite');
+import { getPeople } from './app.js';
 
-let people = [];
+const showDirBtn = document.getElementById('showDir');
+const showTreeBtn = document.getElementById('showTree');
+const treePane = document.getElementById('treePane');
+const dirPane = document.getElementById('dirPane');
 
-init();
+const fitBtn = document.getElementById('fitTree');
+const rootSelect = document.getElementById('rootSelect');
 
-function init(){
-  people = peopleData;
-  const maxInData = people.reduce(
-    (m,p)=>Math.max(m, ...(p.appearsIn && p.appearsIn.length ? p.appearsIn : [1])),
-    1
+let svg, g, zoomBehavior;
+let initialized = false;
+
+function toggle(toTree) {
+  if (toTree) {
+    treePane.style.display = 'block';
+    dirPane.style.display = 'none';
+    if (!initialized) buildTreeOnce();
+  } else {
+    treePane.style.display = 'none';
+    dirPane.style.display = '';
+  }
+}
+
+showTreeBtn?.addEventListener('click', () => toggle(true));
+showDirBtn?.addEventListener('click', () => toggle(false));
+
+// ===== Build a simple parent->children graph using relations =====
+function computeEdges() {
+  const people = getPeople();
+  const byName = new Map(people.map(p => [p.name, p]));
+  const children = new Map();
+
+  // Parent listed with children
+  people.forEach(p => {
+    const rel = p.relations || {};
+    (rel.children || []).forEach(ch => {
+      if (!children.has(p.name)) children.set(p.name, new Set());
+      children.get(p.name).add(ch);
+    });
+  });
+
+  // Parent listed on child (father/mother)
+  people.forEach(p => {
+    const rel = p.relations || {};
+    ['father', 'mother'].forEach(k => {
+      (rel[k] || []).forEach(parent => {
+        if (!children.has(parent)) children.set(parent, new Set());
+        children.get(parent).add(p.name);
+      });
+    });
+  });
+
+  return { children, byName, people };
+}
+
+function rootCandidates(children, people) {
+  const allNames = new Set(people.map(p => p.name));
+  const childNames = new Set(Array.from(children.values()).flatMap(s => Array.from(s)));
+  return Array.from(allNames).filter(n => !childNames.has(n)).sort();
+}
+
+function hierarchyFrom(rootName, edges) {
+  const { children, byName } = edges;
+  const seen = new Set();
+
+  function build(name) {
+    if (seen.has(name)) return null;
+    seen.add(name);
+    const p = byName.get(name) || { name };
+    const kids = Array.from(children.get(name) || []);
+    return {
+      name,
+      role: p.role || '',
+      house: p.house || '',
+      children: kids.map(build).filter(Boolean)
+    };
+  }
+  return build(rootName);
+}
+
+function colorFor(house) {
+  if (/Kaurava/i.test(house)) return '#d75b54';
+  if (/Pandava/i.test(house)) return '#3aa76d';
+  if (/Kuru/i.test(house)) return '#b47c3a';
+  if (/Sage/i.test(house)) return '#6a4fbf';
+  if (/Deity/i.test(house)) return '#3f6ea7';
+  return '#7c5b2e';
+}
+
+function initSVG() {
+  svg = d3.select('#tree');
+  svg.selectAll('*').remove();
+  g = svg.append('g');
+
+  zoomBehavior = d3.zoom().scaleExtent([0.3, 3])
+    .on('zoom', ev => g.attr('transform', ev.transform));
+  svg.call(zoomBehavior);
+
+  fitBtn?.addEventListener('click', fitToView);
+}
+
+function renderTree() {
+  const edges = computeEdges();
+  if (!rootSelect.value && rootSelect.options.length === 0) {
+    const roots = rootCandidates(edges.children, edges.people);
+    rootSelect.innerHTML = roots.map(n => `<option>${n}</option>`).join('');
+  }
+  if (!rootSelect.value && rootSelect.options.length) {
+    rootSelect.selectedIndex = 0;
+  }
+  rootSelect.onchange = () => draw(rootSelect.value, edges);
+
+  draw(rootSelect.value || rootSelect.options[0]?.value, edges);
+}
+
+function draw(rootName, edges) {
+  if (!rootName) return;
+
+  const data = hierarchyFrom(rootName, edges);
+  const root = d3.hierarchy(data);
+  const layout = d3.tree().nodeSize([140, 120]);
+  layout(root);
+
+  g.selectAll('*').remove();
+
+  // links
+  g.selectAll('.link')
+    .data(root.links())
+    .enter()
+    .append('path')
+    .attr('class', 'link')
+    .attr('fill', 'none')
+    .attr('stroke', '#999')
+    .attr('stroke-opacity', 0.6)
+    .attr('d', d3.linkHorizontal()
+      .x(d => d.y + 80)
+      .y(d => d.x + 40)
+    );
+
+  // nodes
+  const node = g.selectAll('.node')
+    .data(root.descendants())
+    .enter()
+    .append('g')
+    .attr('class', 'node')
+    .attr('transform', d => `translate(${d.y},${d.x})`);
+
+  node.append('rect')
+    .attr('width', 160).attr('height', 80).attr('rx', 12).attr('ry', 12)
+    .attr('fill', '#fff')
+    .attr('stroke', d => colorFor(d.data.house))
+    .attr('stroke-width', 2)
+    .attr('filter', null);
+
+  node.append('text')
+    .attr('x', 12).attr('y', 24)
+    .attr('font-weight', 700)
+    .text(d => d.data.name);
+
+  node.append('text')
+    .attr('x', 12).attr('y', 44)
+    .attr('opacity', 0.8)
+    .text(d => d.data.role || d.data.house || '');
+
+  fitToView();
+}
+
+function fitToView() {
+  const bbox = g.node().getBBox();
+  const el = document.getElementById('tree');
+  const width = el.clientWidth || 1200;
+  const height = el.clientHeight || 800;
+
+  const scale = Math.min(
+    width / (bbox.width + 160),
+    height / (bbox.height + 160)
   );
-  chapRange.max = Math.max(maxInData, 10);
-  hookEvents();
-  renderDir();
+
+  const tx = (width - (bbox.width * scale)) / 2 - (bbox.x * scale);
+  const ty = (height - (bbox.height * scale)) / 2 - (bbox.y * scale);
+
+  const t = d3.zoomIdentity.translate(tx, ty).scale(scale);
+  svg.transition().duration(400).call(zoomBehavior.transform, t);
 }
 
-function hookEvents(){
-  [q,role,house,gen].forEach(el=>el.addEventListener('input', renderDir));
-  chapRange.addEventListener('input', ()=>{
-    chapLabel.textContent = chapRange.value;
-    renderDir();
-  });
-  soFar.addEventListener('change', renderDir);
-  hiLite.addEventListener('change', renderDir);
+function buildTreeOnce() {
+  initSVG();
+  renderTree();
+  initialized = true;
 }
 
-function matches(p){
-  const term = q.value.trim().toLowerCase();
-  const chap = parseInt(chapRange.value,10);
-  const firstMention = (p.appearsIn && p.appearsIn.length) ? Math.min(...p.appearsIn) : Infinity;
-  if(role.value && p.role!==role.value) return false;
-  if(house.value && p.house!==house.value) return false;
-  if(gen.value && p.generation!==gen.value) return false;
-  if(soFar.checked && !(firstMention <= chap)) return false;
-  if(!term) return true;
-  const hay = [p.name, ...(p.aliases||[]), p.notes||''].join(' ').toLowerCase();
-  return hay.includes(term);
-}
-
-function cardHTML(p){
-  const chap = parseInt(chapRange.value,10);
-  const hit = (p.appearsIn||[]).includes(chap) && hiLite.checked;
-  const firstMention = (p.appearsIn && p.appearsIn.length) ? Math.min(...p.appearsIn) : null;
-  const aliases = p.aliases?.length ? `<div class="aka">aka: ${p.aliases.join(', ')}</div>`:'';
-  const tags = [p.role,p.house,p.generation].filter(Boolean).map(t=>`<span class="tag">${t}</span>`).join('');
-  const rel = p.relations||{};
-  const relHtml = ['father','mother','spouse','children'].map(k=>{
-    if(!rel[k]||!rel[k].length) return '';
-    return `<div class="rel"><strong>${k}:</strong> ${rel[k].join(', ')}</div>`;
-  }).join('');
-  const badges = [];
-  if(firstMention) badges.push(`First: ch ${firstMention}`);
-  if((p.appearsIn||[]).length>1) badges.push(`Mentions: ch ${(p.appearsIn||[]).slice(0,6).join(', ')}${(p.appearsIn||[]).length>6?'…':''}`);
-  return `<article class="card ${hit?'hit':''}">
-    <img class="avatar" alt="" src="https://placehold.co/96x96/png?text=${encodeURIComponent(p.name[0])}" />
-    <div>
-      <div class="title">${p.name}</div>
-      ${aliases}
-      <div class="meta">${tags}</div>
-      <div class="notes">${p.notes||''}</div>
-      ${badges.length?`<div class="badges">${badges.map(b=>`<span class='badge'>${b}</span>`).join('')}</div>`:''}
-      ${relHtml}
-    </div>
-  </article>`;
-}
-
-function renderDir(){
-  const list = people.filter(matches).sort((a,b)=>a.name.localeCompare(b.name));
-  count.textContent = `${list.length} of ${people.length} people shown — Chapter ${chapRange.value}`;
-  activeFilters.innerHTML = '';
-  [['Role',role.value],['House',house.value],['Gen',gen.value]].forEach(([k,v])=>{
-    if(v){
-      const s=document.createElement('span');
-      s.className='chip';
-      s.textContent=`${k}: ${v}`;
-      activeFilters.appendChild(s);
-    }
-  });
-  grid.innerHTML = list.map(cardHTML).join('');
-}
-
-// expose to tree.js
-export function getPeople(){ return people; }
+// If user lands directly on Tree (rare), ensure it renders on first click
+// (Directory view is default)

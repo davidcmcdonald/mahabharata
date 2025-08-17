@@ -1,6 +1,6 @@
 // js/app.js
 // Assumes `people` global from data/people.js
-
+const people = window.people || [];
 // ===== DOM =====
 const chapRange = document.getElementById('chapRange');
 const chapLabel = document.getElementById('chapLabel');

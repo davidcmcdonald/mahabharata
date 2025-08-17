@@ -1,5 +1,5 @@
 // data/people.js
-export const people = [
+const people = [
   {
     id: "abhimanyu",
     name: "Abhimanyu",
@@ -1029,3 +1029,7 @@ export const people = [
     notes: "Eldest Pandava; son of the god of righteousness; renowned for truth and even temper."
   }
 ];
+
+if (typeof window !== 'undefined') {
+  window.people = people;
+}

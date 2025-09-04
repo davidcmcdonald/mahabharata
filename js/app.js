@@ -6,7 +6,7 @@
   const chapters = Array.isArray(window.chapters) ? window.chapters : [];
   const PEOPLE   = Array.isArray(window.people)   ? window.people   : [];
 
-  // ---------- helpers ----------
+  // --------- helpers ----------
   const stripDiacritics = (s) => String(s||'')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const toAsciiSlug = (s) => stripDiacritics(String(s||'').trim().toLowerCase())
@@ -28,10 +28,12 @@
     return a.name.localeCompare(b.name);
   };
 
+  // --------- avatars ----------
+  const AVATAR_DIR = 'Avatars'; // capital A (your folder)
   const avatarPathFor = (person) => {
-    if (person.avatarOverride) return `Avatars/${person.avatarOverride}`;
+    if (person.avatarOverride) return `${AVATAR_DIR}/${person.avatarOverride}`;
     const slug = toAsciiSlug(person.avatarName || person.name);
-    return `Avatars/${slug}_avatar.jpg`;
+    return `${AVATAR_DIR}/${slug}_avatar.jpg`;
   };
 
   function makePortraitEl(name, src){
@@ -39,9 +41,14 @@
     wrap.className = 'portrait';
 
     const img = document.createElement('img');
+    img.alt = `${name} portrait`;
+    img.loading = 'lazy';
+    img.decoding = 'async';
 
-    // Fallback (handles 404s and weird cached-zero cases)
-    const showFallback = () => {
+    let fallbackShown = false;
+    const showFallback = (reason) => {
+      if (fallbackShown) return;
+      fallbackShown = true;
       img.style.display = 'none';
       if (!wrap.querySelector('.fallback')) {
         const fb = document.createElement('div');
@@ -52,22 +59,37 @@
         fb.textContent = initials || '?';
         wrap.appendChild(fb);
       }
+      if (window.DEBUG_AVATARS) {
+        console.warn('[avatar-fallback]', reason, src);
+      }
     };
 
-    img.addEventListener('error', showFallback, { once:true });
-    img.addEventListener('load', () => {
-      // Sometimes images "load" but have zero natural size (corrupt/cached issue).
-      if (!img.naturalWidth || !img.naturalHeight) showFallback();
+    // If the browser never fires 'error' (e.g. cached 404), force a fallback.
+    const safetyTimer = setTimeout(() => showFallback('timeout-800ms'), 800);
+
+    img.addEventListener('error', () => {
+      clearTimeout(safetyTimer);
+      showFallback('img-error');
     }, { once:true });
 
-    img.alt = `${name} portrait`;
-    img.loading = 'lazy';
-    img.src = src;
+    img.addEventListener('load', () => {
+      clearTimeout(safetyTimer);
+      // Handle "loaded" but zero-dimension (corrupt/HTML response)
+      if (!img.naturalWidth || !img.naturalHeight) {
+        showFallback('zero-dim');
+      }
+    }, { once:true });
+
+    if (window.DEBUG_AVATARS) {
+      console.log('[avatar-try]', src);
+    }
+
+    img.src = src; // set src last so handlers are already bound
     wrap.appendChild(img);
     return wrap;
   }
 
-  // ---------- DOM ----------
+  // --------- DOM ----------
   const $  = (s)=>document.querySelector(s);
   const $$ = (s)=>Array.from(document.querySelectorAll(s));
 
@@ -89,7 +111,7 @@
 
   const sortValue = () => (document.querySelector('input[name="sort"]:checked')?.value) || 'relevant';
 
-  // ---------- render ----------
+  // --------- render ----------
   function setChapter(n){
     const chap = chapters.find(c => c.id === n) || chapters[0] || {id:1,title:'',summary:'',events:[],places:[]};
     chapterLabel.textContent = String(chap.id);
@@ -101,17 +123,12 @@
   }
 
   function personHTML(p, ch){
-    // Role filter
     if (roleEl.value !== 'all' && p.role !== roleEl.value) return '';
-
-    // Hide deceased if toggled
     if (tglHideDeceased.checked && p.deceased) return '';
 
-    // Hide if not mentioned again (last mention before current chapter)
     const last = (p.lastMention ?? Math.max(...(p.appearsIn||[0])));
     if (tglHideNotAgain.checked && last < ch) return '';
 
-    // Search over name, aka, generic desc, and chapter notes
     const q = searchEl.value.trim().toLowerCase();
     if (q){
       const hay = [
@@ -183,17 +200,15 @@
     const ch = Number(chapterSlider.value);
     let arr = [...PEOPLE];
 
-    // Sorting
     const s = sortValue();
     if (s === 'alpha') arr.sort(byAlpha);
     else if (s === 'appearance') arr.sort(byAppearance);
     else arr.sort(byRelevant(ch));
 
-    // Render
     peopleEl.innerHTML = arr.map(p => personHTML(p, ch)).filter(Boolean).join('');
   }
 
-  // ---------- init ----------
+  // --------- init ----------
   function init(){
     const total = chapters.length || 1;
     chapterTotal.textContent = String(total);
@@ -203,11 +218,15 @@
 
     chapterSlider.addEventListener('input', () => setChapter(Number(chapterSlider.value)));
     [searchEl, roleEl, tglHighlight, tglHideDeceased, tglHideNotAgain].forEach(c => c.addEventListener('input', renderPeople));
-    $$( 'input[name="sort"]' ).forEach(r => r.addEventListener('change', renderPeople));
+    Array.from(document.querySelectorAll('input[name="sort"]')).forEach(r => r.addEventListener('change', renderPeople));
   }
 
-  document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded', init)
-    : init();
+  // Turn on to see each attempted image path + fallbacks in console
+  // window.DEBUG_AVATARS = true;
 
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();

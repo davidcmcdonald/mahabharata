@@ -1,34 +1,35 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mahābhārata Reader</title>
-  <link rel="stylesheet" href="/assets/style.css" />
+  <title>Mahābhārata Reader — Kṛṣṇa Dharma Retelling</title>
+  <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="title">Mahābhārata Reader — <span id="bookTitle">Kṛṣṇa Dharma Retelling</span></div>
+    <header class="header">
+      <div class="title">Mahābhārata Reader — Kṛṣṇa Dharma Retelling</div>
       <div class="subtle">UI v1.0</div>
+    </header>
+
+    <!-- Chapter slider -->
+    <div class="card slider-wrap">
+      <div class="slider-head">
+        <label for="chapterSlider">Chapter <span id="chapterLabel">1</span> / <span id="chapterTotal">1</span></label>
+        <div id="chapterMeta" class="subtle"></div>
+      </div>
+      <input id="chapterSlider" class="slider" type="range" min="1" max="1" step="1" value="1" />
     </div>
 
-    <!-- Chapter Slider (full width inside the card) -->
-    <section class="card slider-wrap" aria-label="Chapter chooser">
-      <div class="slider-head">
-        <div><strong>Chapter</strong> <span id="chapterLabel">1</span> / <span id="chapterTotal">1</span></div>
-        <div class="subtle" id="chapterMeta">—</div>
-      </div>
-      <input id="chapterSlider" class="slider" type="range" min="1" max="1" value="1" />
-    </section>
-
-    <!-- Summary + Events / Places -->
-    <section class="row" style="margin-top:16px">
-      <div class="card">
+    <!-- Summary + Places/Events -->
+    <div class="row">
+      <section class="card">
         <h2>Chapter Summary</h2>
         <div id="summary" class="subtle"></div>
-      </div>
-      <div class="grid-2">
+      </section>
+
+      <section class="grid-2">
         <div class="card">
           <h2>Events</h2>
           <ul id="events" class="bullets"></ul>
@@ -37,54 +38,53 @@
           <h2>Places</h2>
           <ul id="places" class="bullets"></ul>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- Characters -->
-    <section class="card" style="margin-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <h2 style="margin:0">Characters</h2>
-        <div class="legend">Toggles: <em>Highlight in this chapter</em>, <em>Hide deceased</em>, <em>Hide if not mentioned again</em></div>
-      </div>
-
+    <!-- Controls -->
+    <section class="card">
       <div class="controls">
-        <!-- Search -->
         <input id="search" class="search" type="search" placeholder="Search characters… (name, alias, notes)" />
 
-        <!-- Role dropdown (keep) -->
-        <label class="sr" for="role">Role</label>
-        <select id="role" class="select">
+        <select id="role" class="select" aria-label="Filter by role">
           <option value="all">All roles</option>
           <option value="Major">Major</option>
           <option value="Significant">Significant</option>
           <option value="Minor">Minor</option>
         </select>
 
-        <!-- Toggles -->
-        <label class="control"><input id="tglHighlight" type="checkbox" checked> Highlight in this chapter</label>
-        <label class="control"><input id="tglHideDeceased" type="checkbox"> Hide deceased</label>
-        <label class="control"><input id="tglHideNotAgain" type="checkbox"> Hide if not mentioned again</label>
+        <label class="control">
+          <input id="tglHighlight" type="checkbox" checked />
+          <span>Highlight in this chapter</span>
+        </label>
+        <label class="control">
+          <input id="tglHideDeceased" type="checkbox" />
+          <span>Hide deceased</span>
+        </label>
+        <label class="control">
+          <input id="tglHideNotAgain" type="checkbox" />
+          <span>Hide if not mentioned again</span>
+        </label>
 
-        <!-- Sorts -->
         <div class="sorts" role="radiogroup" aria-label="Sort">
-          <label><input type="radio" name="sort" value="relevant" checked> Relevant</label>
-          <label><input type="radio" name="sort" value="alpha"> A→Z</label>
-          <label><input type="radio" name="sort" value="appearance"> Order of appearance</label>
+          <label><input type="radio" name="sort" value="relevant" checked /> <span>Relevant</span></label>
+          <label><input type="radio" name="sort" value="alpha" /> <span>A–Z</span></label>
+          <label><input type="radio" name="sort" value="appearance" /> <span>Order of appearance</span></label>
         </div>
       </div>
-
-      <div id="people" class="people"></div>
+      <div class="legend">Tip: if an avatar file is missing, a letter tile will appear automatically.</div>
     </section>
 
-    <p class="subtle" style="margin:16px 4px 0">
-      Avatar file convention: <code>Avatars/&lt;ascii-name&gt;_avatar.jpg</code>
-      (e.g., <code>ambika_avatar.jpg</code>, <code>bhisma_avatar.jpg</code>; Kṛṣṇa → <code>krishna_avatar.jpg</code>).
-    </p>
+    <!-- People grid -->
+    <section class="card">
+      <h2>Characters</h2>
+      <div id="people" class="people"></div>
+    </section>
   </div>
 
-  <!-- Data then app -->
-  <script src="/data/chapters.js"></script>
-  <script src="/data/people.js"></script>
-  <script type="module" src="/js/app.js"></script>
+  <!-- Data first, then app logic -->
+  <script src="data/chapters.js"></script>
+  <script src="data/people.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

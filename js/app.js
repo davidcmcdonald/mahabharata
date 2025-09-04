@@ -70,7 +70,7 @@
     img.loading = 'lazy'; img.decoding = 'async';
     wrap.appendChild(img);
     const initials = (name||'').split(/\s+/).filter(Boolean).slice(0,2).map(w => strip(w[0]||'').toUpperCase()).join('') || '?';
-    const showFallback = () => { if (img.parentNode) img.parentNode.remove(); const fb = document.createElement('div'); fb.className = 'fallback'; fb.textContent = initials; wrap.appendChild(fb); };
+    const showFallback = () => { if (img && img.parentNode) { img.remove(); } const fb = document.createElement('div'); fb.className = 'fallback'; fb.textContent = initials; wrap.appendChild(fb); };
     let i = 0;
     const tryNext = () => {
       if (i >= candidates.length) { showFallback(); return; }

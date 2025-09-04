@@ -38,7 +38,8 @@ function attachAvatarFallback(img, name){
     fb.className = 'fallback';
     const initials = (name||'')
       .split(/\s+/).filter(Boolean).slice(0,2)
-      .map(w=>stripDiacritics(w[0]||'').toUpperCase()).join('');
+      .map(w=>stripDiacritics(w[0]||'').toUpperCase())
+      .join('');
     fb.textContent = initials || '?';
     holder.appendChild(fb);
   }, {once:true});

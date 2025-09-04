@@ -10,10 +10,9 @@
   <div class="container">
     <header class="header">
       <div class="title">Mahābhārata Reader — Kṛṣṇa Dharma Retelling</div>
-      <div class="subtle">UI v1.0</div>
+      <div class="subtle">UI v1.2 (fixed, no Avatars)</div>
     </header>
 
-    <!-- Chapter slider -->
     <div class="card slider-wrap">
       <div class="slider-head">
         <label for="chapterSlider">Chapter <span id="chapterLabel">1</span> / <span id="chapterTotal">1</span></label>
@@ -22,67 +21,52 @@
       <input id="chapterSlider" class="slider" type="range" min="1" max="1" step="1" value="1" />
     </div>
 
-    <!-- Summary + Places/Events -->
     <div class="row">
       <section class="card">
         <h2>Chapter Summary</h2>
         <div id="summary" class="subtle"></div>
       </section>
 
-      <section class="grid-2">
-        <div class="card">
-          <h2>Events</h2>
-          <ul id="events" class="bullets"></ul>
-        </div>
-        <div class="card">
-          <h2>Places</h2>
-          <ul id="places" class="bullets"></ul>
-        </div>
+      <section class="card">
+        <h2>Key Events</h2>
+        <ul id="events" class="events"></ul>
       </section>
     </div>
 
-    <!-- Controls -->
-    <section class="card">
-      <div class="controls">
-        <input id="search" class="search" type="search" placeholder="Search characters… (name, alias, notes)" />
-
-        <select id="role" class="select" aria-label="Filter by role">
-          <option value="all">All roles</option>
-          <option value="Major">Major</option>
-          <option value="Significant">Significant</option>
-          <option value="Minor">Minor</option>
-        </select>
-
+    <section class="card controls">
+      <div class="control-row">
         <label class="control">
-          <input id="tglHighlight" type="checkbox" checked />
-          <span>Highlight in this chapter</span>
-        </label>
-        <label class="control">
-          <input id="tglHideDeceased" type="checkbox" />
-          <span>Hide deceased</span>
-        </label>
-        <label class="control">
-          <input id="tglHideNotAgain" type="checkbox" />
-          <span>Hide if not mentioned again</span>
+          <span>Search</span>
+          <input id="search" type="search" placeholder="name, aka, description…" />
         </label>
 
-        <div class="sorts" role="radiogroup" aria-label="Sort">
-          <label><input type="radio" name="sort" value="relevant" checked /> <span>Relevant</span></label>
-          <label><input type="radio" name="sort" value="alpha" /> <span>A–Z</span></label>
-          <label><input type="radio" name="sort" value="appearance" /> <span>Order of appearance</span></label>
-        </div>
+        <label class="control">
+          <span>Role</span>
+          <select id="role">
+            <option value="">All</option>
+            <option>Major</option>
+            <option>Significant</option>
+            <option>Minor</option>
+          </select>
+        </label>
+
+        <label class="control toggle"><input id="tglHideDeceased" type="checkbox" /> Hide deceased</label>
+        <label class="control toggle"><input id="tglHideNotAgain" type="checkbox" /> Hide not seen after</label>
       </div>
-      <div class="legend">Tip: if an avatar file is missing, a letter tile will appear automatically.</div>
+
+      <div class="control-row">
+        <label class="radio"><input type="radio" name="sort" value="relevance" checked /> Relevance</label>
+        <label class="radio"><input type="radio" name="sort" value="alpha" /> A–Z</label>
+        <label class="radio"><input type="radio" name="sort" value="first" /> First appearance</label>
+      </div>
     </section>
 
-    <!-- People grid -->
     <section class="card">
       <h2>Characters</h2>
       <div id="people" class="people"></div>
     </section>
   </div>
 
-  <!-- Data first, then app logic -->
   <script src="data/chapters.js"></script>
   <script src="data/people.js"></script>
   <script src="js/app.js"></script>

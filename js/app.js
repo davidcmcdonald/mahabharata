@@ -1,7 +1,4 @@
 // /js/app.js
-// expects window.chapters (from /data/chapters.js)
-// and window.people   (from /data/people.js)
-
 (() => {
   const chapters = Array.isArray(window.chapters) ? window.chapters : [];
   const PEOPLE   = Array.isArray(window.people)   ? window.people   : [];
@@ -13,6 +10,7 @@
     .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
 
   const roleRank = { "Major":0, "Significant":1, "Minor":2 };
+
   const byAlpha = (a,b) => a.name.localeCompare(b.name);
   const byRelevant = (ch) => (a,b) => {
     const ain = (a.appearsIn||[]).includes(ch), bin = (b.appearsIn||[]).includes(ch);
@@ -28,15 +26,25 @@
     return a.name.localeCompare(b.name);
   };
 
-  // --------- avatars ----------
-  const AVATAR_DIR = 'Avatars'; // capital A (your folder)
-  const avatarPathFor = (person) => {
-    if (person.avatarOverride) return `${AVATAR_DIR}/${person.avatarOverride}`;
+  // --------- Avatars with robust fallback ----------
+  const AVATAR_DIRS = ['Avatars','avatars'];
+  const EXTENSIONS  = ['jpg','jpeg','png','webp'];
+
+  const avatarCandidatesFor = (person) => {
+    if (person.avatarOverride) {
+      return AVATAR_DIRS.map(d => `${d}/${person.avatarOverride}`);
+    }
     const slug = toAsciiSlug(person.avatarName || person.name);
-    return `${AVATAR_DIR}/${slug}_avatar.jpg`;
+    const names = [];
+    for (const ext of EXTENSIONS) {
+      names.push(`${slug}_avatar.${ext}`, `${slug}.${ext}`);
+    }
+    const paths = [];
+    for (const d of AVATAR_DIRS) for (const n of names) paths.push(`${d}/${n}`);
+    return paths;
   };
 
-  function makePortraitEl(name, src){
+  function makePortraitEl(name, candidates){
     const wrap = document.createElement('div');
     wrap.className = 'portrait';
 
@@ -44,48 +52,49 @@
     img.alt = `${name} portrait`;
     img.loading = 'lazy';
     img.decoding = 'async';
+    wrap.appendChild(img);
 
     let fallbackShown = false;
+    const initials = (name||'')
+      .split(/\s+/).filter(Boolean).slice(0,2)
+      .map(w => stripDiacritics(w[0]||'').toUpperCase()).join('') || '?';
+
     const showFallback = (reason) => {
       if (fallbackShown) return;
       fallbackShown = true;
-      img.style.display = 'none';
-      if (!wrap.querySelector('.fallback')) {
-        const fb = document.createElement('div');
-        fb.className = 'fallback';
-        const initials = (name||'')
-          .split(/\s+/).filter(Boolean).slice(0,2)
-          .map(w => stripDiacritics(w[0]||'').toUpperCase()).join('');
-        fb.textContent = initials || '?';
-        wrap.appendChild(fb);
-      }
-      if (window.DEBUG_AVATARS) {
-        console.warn('[avatar-fallback]', reason, src);
-      }
+      // remove broken img so it never hides the letters
+      if (img.parentNode) img.parentNode.removeChild(img);
+      const fb = document.createElement('div');
+      fb.className = 'fallback';
+      fb.textContent = initials;
+      wrap.appendChild(fb);
+      if (window.DEBUG_AVATARS) console.warn('[avatar-fallback]', reason, candidates);
     };
 
-    // If the browser never fires 'error' (e.g. cached 404), force a fallback.
-    const safetyTimer = setTimeout(() => showFallback('timeout-800ms'), 800);
+    // preload each candidate; only set <img> src on a confirmed success
+    let idx = 0;
+    const tryNext = () => {
+      if (idx >= candidates.length) { showFallback('exhausted'); return; }
+      const src = candidates[idx++];
 
-    img.addEventListener('error', () => {
-      clearTimeout(safetyTimer);
-      showFallback('img-error');
-    }, { once:true });
+      const test = new Image();
+      const timer = setTimeout(() => {
+        test.onload = test.onerror = null;
+        tryNext();
+      }, 1500);
 
-    img.addEventListener('load', () => {
-      clearTimeout(safetyTimer);
-      // Handle "loaded" but zero-dimension (corrupt/HTML response)
-      if (!img.naturalWidth || !img.naturalHeight) {
-        showFallback('zero-dim');
-      }
-    }, { once:true });
+      test.onload = () => {
+        clearTimeout(timer);
+        img.src = src;
+      };
+      test.onerror = () => {
+        clearTimeout(timer);
+        tryNext();
+      };
+      test.src = src;
+    };
 
-    if (window.DEBUG_AVATARS) {
-      console.log('[avatar-try]', src);
-    }
-
-    img.src = src; // set src last so handlers are already bound
-    wrap.appendChild(img);
+    tryNext();
     return wrap;
   }
 
@@ -100,133 +109,139 @@
 
   const summaryEl = $('#summary');
   const eventsEl  = $('#events');
-  const placesEl  = $('#places');
-
-  const searchEl  = $('#search');
-  const roleEl    = $('#role');
-  const tglHighlight    = $('#tglHighlight');
-  const tglHideDeceased = $('#tglHideDeceased');
-  const tglHideNotAgain = $('#tglHideNotAgain');
   const peopleEl  = $('#people');
 
-  const sortValue = () => (document.querySelector('input[name="sort"]:checked')?.value) || 'relevant';
+  const searchEl       = $('#search');
+  const roleEl         = $('#role');
+  const tglHideDeceased= $('#tglHideDeceased');
+  const tglHideNotAgain= $('#tglHideNotAgain');
 
-  // --------- render ----------
   function setChapter(n){
-    const chap = chapters.find(c => c.id === n) || chapters[0] || {id:1,title:'',summary:'',events:[],places:[]};
-    chapterLabel.textContent = String(chap.id);
-    chapterMeta.textContent  = chap.title || '';
-    summaryEl.textContent    = chap.summary || '';
-    eventsEl.innerHTML = (chap.events||[]).map(e=>`<li>${e}</li>`).join('');
-    placesEl.innerHTML = (chap.places||[]).map(p=>`<li>${p}</li>`).join('');
+    const ch = chapters.find(c => c.id === n);
+    if (!ch) return;
+    chapterLabel.textContent = String(ch.id);
+    chapterTotal.textContent = String(chapters.length);
+    chapterMeta.textContent = ch.title || '';
+
+    summaryEl.textContent = ch.summary || '';
+    eventsEl.innerHTML = '';
+    (ch.events||[]).forEach(e => {
+      const li = document.createElement('li');
+      li.textContent = e;
+      eventsEl.appendChild(li);
+    });
+
+    chapterSlider.value = String(n);
     renderPeople();
   }
 
-  function personHTML(p, ch){
-    if (roleEl.value !== 'all' && p.role !== roleEl.value) return '';
-    if (tglHideDeceased.checked && p.deceased) return '';
-
-    const last = (p.lastMention ?? Math.max(...(p.appearsIn||[0])));
-    if (tglHideNotAgain.checked && last < ch) return '';
-
-    const q = searchEl.value.trim().toLowerCase();
-    if (q){
-      const hay = [
-        p.name,
-        ...(p.aka||[]),
-        p.desc||'',
-        ...(p.chapters ? Object.values(p.chapters) : [])
-      ].join(' \n ').toLowerCase();
-      if (!hay.includes(q)) return '';
-    }
-
-    const inChapter = (p.appearsIn||[]).includes(ch);
-    const card = document.createElement('div');
-    card.className = `person ${inChapter && tglHighlight.checked ? 'in-chapter':''} ${!inChapter && tglHighlight.checked ? 'muted':''}`.trim();
-
-    const portrait = makePortraitEl(p.name, avatarPathFor(p));
-    const body = document.createElement('div');
-    body.className = 'person-body';
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'name';
-    nameEl.textContent = p.name;
-
-    const akaEl = (p.aka && p.aka.length)
-      ? (()=>{ const el = document.createElement('div'); el.className='aka'; el.textContent = `aka: ${p.aka.join(', ')}`; return el; })()
-      : null;
-
-    const descEl = document.createElement('div');
-    descEl.className = 'desc';
-    descEl.textContent = p.desc || '';
-
-    const noteEl = (p.chapters && p.chapters[ch])
-      ? (()=>{ const el = document.createElement('div'); el.className='note'; el.textContent = p.chapters[ch]; return el; })()
-      : null;
-
-    const badges = document.createElement('div');
-    badges.className = 'badges';
-    const roleBadge = document.createElement('span');
-    roleBadge.className = 'badge';
-    roleBadge.textContent = p.role || '—';
-    badges.appendChild(roleBadge);
-
-    if (p.deceased) {
-      const dead = document.createElement('span');
-      dead.className = 'badge deceased';
-      dead.textContent = 'Deceased';
-      badges.appendChild(dead);
-    }
-    if (inChapter) {
-      const here = document.createElement('span');
-      here.className = 'badge';
-      here.textContent = 'In this chapter';
-      badges.appendChild(here);
-    }
-
-    body.appendChild(nameEl);
-    if (akaEl) body.appendChild(akaEl);
-    body.appendChild(descEl);
-    if (noteEl) body.appendChild(noteEl);
-    body.appendChild(badges);
-
-    card.appendChild(portrait);
-    card.appendChild(body);
-
-    return card.outerHTML;
-  }
-
   function renderPeople(){
-    const ch = Number(chapterSlider.value);
-    let arr = [...PEOPLE];
+    const currentChapter = Number(chapterSlider.value);
+    const q = stripDiacritics(searchEl.value || '').toLowerCase();
+    const role = roleEl.value;
 
-    const s = sortValue();
-    if (s === 'alpha') arr.sort(byAlpha);
-    else if (s === 'appearance') arr.sort(byAppearance);
-    else arr.sort(byRelevant(ch));
+    let list = PEOPLE.slice();
 
-    peopleEl.innerHTML = arr.map(p => personHTML(p, ch)).filter(Boolean).join('');
+    if (q) {
+      list = list.filter(p => {
+        const hay = [
+          p.name,
+          ...(p.aka||[]),
+          p.desc || '',
+          ...Object.values(p.chapters||{})
+        ].join(' ').toLowerCase();
+        return stripDiacritics(hay).includes(q);
+      });
+    }
+    if (role) list = list.filter(p => (p.role||'') === role);
+    if (tglHideDeceased.checked) list = list.filter(p => !p.deceased);
+    if (tglHideNotAgain.checked) list = list.filter(p => (p.lastMention||Infinity) >= currentChapter);
+
+    const selectedSort = (document.querySelector('input[name="sort"]:checked')||{}).value || 'relevance';
+    if (selectedSort === 'alpha') list.sort(byAlpha);
+    else if (selectedSort === 'first') list.sort(byAppearance);
+    else list.sort(byRelevant(currentChapter));
+
+    peopleEl.innerHTML = '';
+    for (const p of list) {
+      const inChapter = (p.appearsIn||[]).includes(currentChapter);
+      const card = document.createElement('article');
+      card.className = 'person';
+
+      const portrait = makePortraitEl(p.name, avatarCandidatesFor(p));
+      card.appendChild(portrait);
+
+      const body = document.createElement('div');
+      body.className = 'person-body';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'name';
+      nameEl.textContent = p.name;
+
+      const akaEl = (p.aka && p.aka.length)
+        ? (()=>{ const el = document.createElement('div'); el.className='aka'; el.textContent = `aka: ${p.aka.join(', ')}`; return el; })()
+        : null;
+
+      const descEl = document.createElement('div');
+      descEl.className = 'desc';
+      descEl.textContent = p.desc || '';
+
+      const noteEl = (p.chapters && p.chapters[currentChapter])
+        ? (()=>{ const el = document.createElement('div'); el.className='note'; el.textContent = p.chapters[currentChapter]; return el; })()
+        : null;
+
+      const badges = document.createElement('div');
+      badges.className = 'badges';
+      const roleBadge = document.createElement('span');
+      roleBadge.className = 'badge';
+      roleBadge.textContent = p.role || '—';
+      badges.appendChild(roleBadge);
+
+      if (p.deceased) {
+        const dead = document.createElement('span');
+        dead.className = 'badge deceased';
+        dead.textContent = 'Deceased';
+        badges.appendChild(dead);
+      }
+      if (inChapter) {
+        const here = document.createElement('span');
+        here.className = 'badge in-ch';
+        here.textContent = 'In this chapter';
+        badges.appendChild(here);
+      }
+      if ((p.lastMention||Infinity) < currentChapter) {
+        const na = document.createElement('span');
+        na.className = 'badge not-again';
+        na.textContent = 'Not seen after';
+        badges.appendChild(na);
+      }
+
+      body.appendChild(nameEl);
+      if (akaEl) body.appendChild(akaEl);
+      body.appendChild(descEl);
+      if (noteEl) body.appendChild(noteEl);
+      body.appendChild(badges);
+
+      card.appendChild(body);
+      peopleEl.appendChild(card);
+    }
   }
 
-  // --------- init ----------
   function init(){
-    const total = chapters.length || 1;
-    chapterTotal.textContent = String(total);
-    chapterSlider.max = String(total);
-    chapterSlider.value = String(chapters[0]?.id || 1);
-    setChapter(Number(chapterSlider.value));
+    chapterSlider.min  = chapters.length ? String(Math.min(...chapters.map(c=>c.id))) : '1';
+    chapterSlider.max  = chapters.length ? String(Math.max(...chapters.map(c=>c.id))) : '1';
+    chapterSlider.step = '1';
+    chapterTotal.textContent = String(chapters.length);
+    const firstId = chapters.length ? Math.min(...chapters.map(c=>c.id)) : 1;
+    setChapter(firstId);
 
     chapterSlider.addEventListener('input', () => setChapter(Number(chapterSlider.value)));
-    [searchEl, roleEl, tglHighlight, tglHideDeceased, tglHideNotAgain].forEach(c => c.addEventListener('input', renderPeople));
+    [searchEl, roleEl, tglHideDeceased, tglHideNotAgain].forEach(c => c.addEventListener('input', renderPeople));
     Array.from(document.querySelectorAll('input[name="sort"]')).forEach(r => r.addEventListener('change', renderPeople));
   }
 
-  // Turn on to see each attempted image path + fallbacks in console
   // window.DEBUG_AVATARS = true;
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

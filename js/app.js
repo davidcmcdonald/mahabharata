@@ -1,22 +1,5 @@
-// app.js — v5b
+// app.js — v5
 (() => {
-
-// ---- v5b: global error catcher & safe mode ----
-let SAFE_MODE = false;
-function showErrorOverlay(msg){
-  try {
-    const el = document.getElementById('errorOverlay');
-    const pre = document.getElementById('errorText');
-    if (!el || !pre) return;
-    pre.textContent = String(msg || 'Unknown error');
-    el.style.display = 'block';
-    const btn = document.getElementById('btnSafeMode');
-    if (btn){ btn.onclick = () => { SAFE_MODE = true; el.style.display = 'none'; try { renderChapterMeta(currentChapterId()); renderGrid(); } catch(e){} }; }
-  } catch(e){ console.error('Overlay failed', e); }
-}
-window.addEventListener('error', (e) => { showErrorOverlay(e.message + (e.error && e.error.stack ? "\n\n" + e.error.stack : '')); });
-window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise rejection: ' + (e.reason && e.reason.stack ? e.reason.stack : e.reason)); });
-
   const CH = Array.isArray(window.chapters) ? window.chapters : [];
   const PEOPLE = Array.isArray(window.people) ? window.people : [];
   const PLACES = Array.isArray(window.places) ? window.places : [];
@@ -136,62 +119,22 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
     return paths;
   };
 
-  
-  const makePortrait = (name, candidates, cacheKey) => {
+  const makePortrait = (name, candidates) => {
     const wrap = document.createElement('div'); wrap.className = 'portrait';
     const img = document.createElement('img'); img.alt = `${name} portrait`; img.loading = 'lazy'; img.decoding = 'async';
-    const initials = (name||'').split(/\s+/).filter(Boolean).slice(0,2).map(w => strip(w[0]||'').toUpperCase()).join('') || '?';
-    // Show fallback *immediately*
-    const fb = document.createElement('div'); fb.className = 'fallback'; fb.textContent = initials;
-    wrap.appendChild(fb);
     wrap.appendChild(img);
-
-    const applySrc = (src) => {
-      if (!wrap.isConnected) return;
-      if (src){ img.src = src; if (fb && fb.parentNode) fb.remove(); }
-      else { if (img && img.parentNode) img.remove(); /* fallback stays */ }
-    };
-
-    // Use cache if we have a winner
-    if (cacheKey && IMG_CACHE.has(cacheKey)){
-      const cached = IMG_CACHE.get(cacheKey);
-      applySrc(cached.src);
-      return wrap;
-    }
-
-    // Loader with guards
-    let i = 0, destroyed = false;
+    const initials = (name||'').split(/\s+/).filter(Boolean).slice(0,2).map(w => strip(w[0]||'').toUpperCase()).join('') || '?';
+    const showFallback = () => { if (img && img.parentNode) { img.remove(); } const fb = document.createElement('div'); fb.className = 'fallback'; fb.textContent = initials; wrap.appendChild(fb); };
+    let i = 0;
     const tryNext = () => {
-      if (destroyed || !wrap.isConnected) return;
-      if (i >= candidates.length){ 
-        if (cacheKey) IMG_CACHE.set(cacheKey, {src:null});
-        applySrc(null); 
-        return; 
-      }
+      if (i >= candidates.length) { showFallback(); return; }
       const src = candidates[i++];
       const test = new Image();
       const to = setTimeout(() => { test.onload = test.onerror = null; tryNext(); }, 1500);
-      test.onload = () => {
-        clearTimeout(to);
-        if (destroyed || !wrap.isConnected) return;
-        applySrc(src);
-        if (cacheKey) IMG_CACHE.set(cacheKey, {src});
-      };
+      test.onload = () => { clearTimeout(to); img.src = src; };
       test.onerror = () => { clearTimeout(to); tryNext(); };
       test.src = src;
     };
-
-    // Start when visible (or fallback to immediate)
-    wrap.__startLoad = () => { if (!wrap.__started){ wrap.__started = true; tryNext(); } };
-    if (IO){ IO.observe(wrap); } else { setTimeout(wrap.__startLoad, 0); }
-
-    // Clean-up when removed (best-effort)
-    const mo = new MutationObserver(() => { if (!wrap.isConnected){ destroyed = true; mo.disconnect(); } });
-    try { mo.observe(document.body, {childList:true, subtree:true}); } catch(e){}
-
-    return wrap;
-  };
-
     tryNext();
     return wrap;
   };
@@ -224,7 +167,7 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
     idx.sort((a,b)=>b.display.length - a.display.length);
     return idx;
   }
-  function annotateEntitiesHTML(text, chId){ if (SAFE_MODE) return (text||'');
+  function annotateEntitiesHTML(text, chId){
     if (!text) return '';
     let html = (text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const idx = buildEntityIndex(chId);
@@ -350,7 +293,7 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
       for (const p of list){
         const card = document.createElement('article'); card.className = 'item'; card.dataset.type = 'person'; card.dataset.id = p.id;
         if (isInCurrentChapterPerson(p.id, chId)) card.classList.add('in-chapter');
-        const portrait = makePortrait(p.name, candidatesFor(p,false), 'person:'+p.id);
+        const portrait = makePortrait(p.name, candidatesFor(p,false));
         card.appendChild(portrait);
         const body = document.createElement('div'); body.className = 'body';
         const nameEl = document.createElement('div'); nameEl.className = 'name'; nameEl.textContent = p.name;
@@ -419,7 +362,7 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
       for (const pl of list){
         const card = document.createElement('article'); card.className = 'item'; card.dataset.type='place'; card.dataset.id=pl.id;
         if (isInCurrentChapterPlace(pl.id, chId)) card.classList.add('in-chapter');
-        const portrait = makePortrait(pl.name, candidatesFor(pl,true), 'place:'+pl.id);
+        const portrait = makePortrait(pl.name, candidatesFor(pl,true));
         card.appendChild(portrait);
         const body = document.createElement('div'); body.className = 'body';
         const nameEl = document.createElement('div'); nameEl.className = 'name'; nameEl.textContent = pl.name;
@@ -515,7 +458,6 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
   function setChapter(n){ renderChapterMeta(n); renderGrid(); }
 
   function init(){
-    if (!Array.isArray(CH) || !Array.isArray(PEOPLE) || !Array.isArray(PLACES)) { showErrorOverlay('Data files failed to load.'); return; }
     CH.sort((a,b)=>a.id-b.id);
     chapterSlider.min = String(CH[0]?.id || 1);
     chapterSlider.max = String(CH[CH.length-1]?.id || 88);
@@ -523,7 +465,7 @@ window.addEventListener('unhandledrejection', (e) => { showErrorOverlay('Promise
     chapterTotal.textContent = String(CH.length || 88);
     const firstId = CH[0]?.id || 1;
     setChapter(firstId); chapterSlider.value = String(firstId);
-    let _slTimer=null; chapterSlider.addEventListener('input', () => { clearTimeout(_slTimer); const v = Number(chapterSlider.value); chapterLabel.textContent=String(v); _slTimer = setTimeout(()=> setChapter(v), 120); });
+    chapterSlider.addEventListener('input', () => setChapter(Number(chapterSlider.value)));
     searchEl.addEventListener('input', renderGrid);
     document.querySelectorAll('input[name="sort"]').forEach(r => r.addEventListener('change', renderGrid));
     tabPeople.addEventListener('click', () => { activeTab='people'; tabPeople.classList.add('active'); tabPlaces.classList.remove('active'); renderGrid(); });

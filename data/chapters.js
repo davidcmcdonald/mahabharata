@@ -122,8 +122,13 @@ window.chapters = [
       ]
     },
     "notes": {
-      "people": {},
-      "places": {}
+      "people": {
+        "vyasa_kr_sna_dvaipayana": "Niyoga: fathers Dhṛtarāṣṭra, Pāṇḍu, Vidura at Satyavatī’s request.",
+        "bh_sma_devavrata": "His vow bars him from the throne; acts as regent."
+      },
+      "places": {
+        "hastin_pura": "Kuru capital; scene for succession crisis."
+      }
     }
   },
   {
@@ -677,7 +682,9 @@ window.chapters = [
       ]
     },
     "notes": {
-      "people": {},
+      "people": {
+        "karna": "Crowned king of Aṅga by Duryodhana during the exhibition."
+      },
       "places": {}
     }
   },
@@ -1286,8 +1293,12 @@ window.chapters = [
       ]
     },
     "notes": {
-      "people": {},
-      "places": {}
+      "people": {
+        "arjuna": "Wins Draupadī while disguised as a brāhmaṇa."
+      },
+      "places": {
+        "k_mpilya_svaya_vara_stadium": "Target: revolving disc above; shoot through to hit the mark."
+      }
     }
   },
   {

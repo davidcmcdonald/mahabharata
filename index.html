@@ -3,28 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mahābhārata Reader</title>
+  <title>Mahābhārata Reader v5</title>
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
   <div class="container">
     <header class="header">
-      <div class="title">Mahābhārata Reader</div>
-      <div class="subtle">v4 — user chapters 1–11 + life events</div>
+      <div class="title">Mahābhārata Reader <span class="tag">v5</span></div>
+      <div class="actions">
+        <button id="btnEdit" class="btn">✏️ Edit</button>
+        <button id="btnExport" class="btn">⬇️ Export data</button>
+      </div>
     </header>
 
     <section class="card slider-wrap">
       <div class="slider-head">
-        <label for="chapterSlider">Chapter <span id="chapterLabel">1</span> / <span id="chapterTotal">88</span></label>
-        <div id="chapterMeta" class="subtle"></div>
+        <div>
+          <label for="chapterSlider">Chapter <span id="chapterLabel">1</span> / <span id="chapterTotal">88</span></label>
+          <div id="chapterMeta" class="subtle"></div>
+        </div>
+        <input id="chapterSlider" class="slider" type="range" min="1" max="88" step="1" value="1" />
       </div>
-      <input id="chapterSlider" class="slider" type="range" min="1" max="88" step="1" value="1" />
+      <div id="chapterEditor" class="editor" style="display:none;">
+        <div class="row">
+          <label>Title<input type="text" id="edChTitle"></label>
+        </div>
+        <div class="row">
+          <label>Summary<textarea id="edChSummary"></textarea></label>
+        </div>
+        <div class="row">
+          <label>Events (one per line)<textarea id="edChEvents"></textarea></label>
+        </div>
+        <div class="actions-r">
+          <button id="btnChSave" class="btn">Save chapter</button>
+          <button id="btnChCancel" class="btn">Cancel</button>
+        </div>
+      </div>
     </section>
 
     <div class="row">
       <section class="card">
         <h2>Chapter Summary</h2>
-        <div id="summary" class="subtle"></div>
+        <div id="summary" class="richtext"></div>
       </section>
 
       <section class="card">
@@ -58,6 +78,8 @@
       <div id="grid" class="grid"></div>
     </section>
   </div>
+
+  <div id="hoverPreview" class="preview" style="display:none;"></div>
 
   <script src="data/chapters.js"></script>
   <script src="data/people.js"></script>
